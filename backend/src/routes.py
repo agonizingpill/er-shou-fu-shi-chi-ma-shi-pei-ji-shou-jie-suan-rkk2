@@ -5,14 +5,18 @@ from .models import *
 from .schemas import *
 from .common import *
 from .security import current,allow
-from . import consignment_service as consignment,fit_service as fit,fitting_service as fitting,sale_service as sale,return_service as returns,settlement_service as settlement
+from . import consignment_service as consignment,fit_service as fit,fit_withdrawal_service as fit_withdrawal,fitting_service as fitting,sale_service as sale,return_service as returns,settlement_service as settlement
 router=APIRouter()
 def change(u,action,fn,supervisor=False):
  allow(u,*(['supervisor'] if supervisor else ['operator','supervisor']))
  with Session() as s:x=fn(s);audit(s,u,action,x);s.commit();return dump(x)
 @router.get('/register')
 def register(u=Depends(current)):
- with Session() as s:return {n:[dump(x) for x in rows(s,c)] for n,c in [('consignors',Consignor),('agreements',Agreement),('amendments',Amendment),('garments',Garment),('measurements',Measurement),('profiles',FitProfile),('assessments',FitAssessment),('fittings',Fitting),('sales',Sale),('returns',Return),('payouts',Payout),('withdrawals',Withdrawal),('clock',Shop)]}
+ with Session() as s:
+  data={n:[dump(x) for x in rows(s,c)] for n,c in [('consignors',Consignor),('agreements',Agreement),('amendments',Amendment),('garments',Garment),('measurements',Measurement),('assessments',FitAssessment),('fittings',Fitting),('sales',Sale),('returns',Return),('payouts',Payout),('withdrawals',Withdrawal),('fit_withdrawals',FitWithdrawal),('clock',Shop)]}
+  # 受理撤回起，匿名体型即从顾问可见数据中消失，清理后物理删除
+  data['profiles']=[dump(x) for x in rows(s,FitProfile) if x.state=='active']
+  return data
 @router.get('/audit')
 def audits(u=Depends(current)):
  with Session() as s:return [dump(x) for x in rows(s,Audit)]
@@ -28,6 +32,10 @@ def garments(d:GarmentIn,u=Depends(current)):return change(u,'入店验衣',lamb
 def measurements(d:MeasurementIn,u=Depends(current)):return change(u,'服饰实测',lambda s:fit.measure(s,d.model_dump()))
 @router.post('/profiles')
 def profiles(d:ProfileIn,u=Depends(current)):return change(u,'匿名体型',lambda s:fit.profile(s,d.model_dump()))
+@router.post('/fit-withdrawals')
+def fit_withdrawals(d:FitWithdrawalIn,u=Depends(current)):return change(u,'适配撤回受理',lambda s:fit_withdrawal.request(s,d.model_dump()))
+@router.post('/fit-withdrawals/{id}/cleanup')
+def fit_withdrawal_cleanup(id:int,u=Depends(current)):return change(u,'适配撤回清理',lambda s:fit_withdrawal.cleanup(s,id))
 @router.post('/assessments')
 def assessments(d:AssessmentIn,u=Depends(current)):
  d=change(u,'适配计算',lambda s:fit.assess(s,d.model_dump()))

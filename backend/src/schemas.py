@@ -28,4 +28,6 @@ class InspectionIn(Input):
 class PayoutIn(Input):
  sale_id:int;reference:str=Field(min_length=3,max_length=60)
 class ReasonIn(Input):reason:str=Field(min_length=8,max_length=500)
+class FitWithdrawalIn(ReasonIn):
+ profile_id:int
 class ClockIn(ReasonIn):now:str

@@ -1,7 +1,8 @@
 from .models import *
 from .common import *
 def reserve(s,d):
- c=lock(s);g=garment(s,d['garment_id']);a=get(s,Agreement,g.agreement_id);get(s,FitProfile,d['profile_id'])
+ c=lock(s);g=garment(s,d['garment_id']);a=get(s,Agreement,g.agreement_id);p=get(s,FitProfile,d['profile_id'])
+ if p.state!='active':fail('该匿名体型已撤回，不得安排试衣')
  if g.state!='listed':fail('衣物已留给他人或不可试穿')
  st,en=time(d['starts']),time(d['ends'])
  if st>=en or st<time(c.now) or en>time(a.ends):fail('预约时段无效或超出寄售期')

@@ -22,7 +22,7 @@ docker compose up -d --build --wait
 ## 六个协作模块
 
 1. **寄售与品相**：Consignor→Agreement→Garment。协议约定底价分值、佣金万分比和到期时间；衣物标价不得低于底价。佣金修订产生Amendment前后值与理由，已有settled销售时禁止再改。旧销售的佣金快照不随协议修改。
-2. **实测与适配**：Measurement记录胸围、肩宽、衣长、弹性和版型；未实测不能推荐，实测后unmeasured→listed。FitProfile用匿名编号；FitAssessment经worker真实计算，queued→ready/failed，失败可重新提交新评估。
+2. **实测与适配**：Measurement记录胸围、肩宽、衣长、弹性和版型；未实测不能推荐，实测后unmeasured→listed。FitProfile用匿名编号；FitAssessment经worker真实计算，queued→ready/failed，失败可重新提交新评估。买家可在尺码适配页撤回其匿名体型：顾问受理即生成FitWithdrawal撤回单（pending待清理），体型state置withdrawn并从所有列表/下拉即时不可查，排队与计算中的FitAssessment一律作废（state=withdrawn），worker只回写仍queued的任务，迟到结果在写回前再校验profile状态、绝不落库。清理（cleanup，可中断恢复、可重试且始终复用原撤回单不新增记录）物理删除FitProfile，评估结果只保留已给出的松紧判定label，features/probabilities/哈希等可倒推围度的依据彻底清除并解除profile关联；完成后撤回单cleaned，顾问可在撤回看板区分待清理与已清理。
 3. **预约与排他留衣**：Fitting约定买家、衣物、试衣位1/2和至多2小时时段。只有listed可约，预约使衣物held；一衣一客和同位时段不重叠，取消释放为listed。有效协议结束前才可安排。
 4. **成交与佣金**：只有当前留衣在预约时间内成交，价格≥底价。Sale按当时佣金万分比四舍五入到分，保存成交、佣金、应付金额与七天退货截止，衣物sold，预约completed。
 5. **退货与复检**：七天内未结算订单可退，Sale returned、衣物inspection；pending退货必须店长记检查结果，relist恢复listed，retire产生交还凭据。寄售期已满不可复上架。原已退销售不能结算。
@@ -45,11 +45,11 @@ Shop演示时钟从2026-11-18开始，仅店长可单向推进并留审计，便
 
 `fit_model.py`生成seed42的300条**模拟标注**样本，特征为胸围余量、肩宽余量、弹性、版型；三类合身/偏紧/偏松各100条。先分层留出25%（训练225/留出75），Pipeline仅在训练集拟合StandardScaler，再拟合KNeighborsClassifier(k=5, weights=distance)。输出本件与本人的特征、分类概率、balanced accuracy、混淆矩阵、训练/留出ID和训练/输入SHA256。验收balanced accuracy=1.0，只表示该合成分布可分，不代表真实体型或舒适度预测准确率，最终由试衣确认。
 
-worker通过Redis BLPOP读取实际FitAssessment，结果持久化。Redis短暂断线会按连接/读超时捕获并重连，保持worker存活；入队不可用返回503并留下failed记录，恢复后可新提交评估。Redis真实stop/start验收后worker PID未变，新任务正常ready。
+worker通过Redis BLPOP读取实际FitAssessment，结果持久化。Redis短暂断线会按连接/读超时捕获并重连，保持worker存活；入队不可用返回503并留下failed记录，恢复后可新提交评估。Redis真实stop/start验收后worker PID未变，新任务正常ready。买家撤回时已弹出但尚未完成的任务在写回前再次校验FitProfile状态，非active即放弃ready结果，保证迟到的推理结果不会写回。
 
 ## 结构、枚举与开发
 
-backend/src/models.py为寄售关系模型，schemas.py严格字段校验与非有限值拒绝；consignment_service、fit_service、fitting_service、sale_service、return_service、settlement_service分别封装六领域规则。routes.py做JWT权限，common.py做父锁/审计，fit_model/worker负责计算。middlewares.py有RequestTrace及Recovery。
+backend/src/models.py为寄售关系模型，schemas.py严格字段校验与非有限值拒绝；consignment_service、fit_service、fit_withdrawal_service、fitting_service、sale_service、return_service、settlement_service分别封装领域规则。routes.py做JWT权限，common.py做父锁/审计，fit_model/worker负责计算。middlewares.py有RequestTrace及Recovery。
 
 frontend/src/pages六页独立业务任务，components/tailor.js含衣物吊牌、状态、标题/表单等共享组件，utils/api.js做请求/会话/store、utils/format.js做转义/数据类型。角色、服饰状态、适配类别枚举在backend/src/constants.py；前端角色/状态在frontend/src/constants.js，算法标签与展示文案对应。
 

@@ -24,10 +24,13 @@ class Measurement(Base):
  id=Column(Integer,primary_key=True);garment_id=Column(Integer,ForeignKey('garments.id'),unique=True,nullable=False);chest=Column(Float,nullable=False);shoulder=Column(Float,nullable=False);length=Column(Float,nullable=False);elasticity=Column(Float,nullable=False);cut=Column(Integer,nullable=False)
 class FitProfile(Base):
  __tablename__='profiles'
- id=Column(Integer,primary_key=True);code=Column(String(40),unique=True,nullable=False);chest=Column(Float,nullable=False);shoulder=Column(Float,nullable=False)
+ id=Column(Integer,primary_key=True);code=Column(String(40),unique=True,nullable=False);chest=Column(Float,nullable=False);shoulder=Column(Float,nullable=False);state=Column(String(20),default='active',nullable=False)
 class FitAssessment(Base):
  __tablename__='assessments'
- id=Column(Integer,primary_key=True);garment_id=Column(Integer,ForeignKey('garments.id'),nullable=False);profile_id=Column(Integer,ForeignKey('profiles.id'),nullable=False);state=Column(String(20),default='queued');result=Column(JSON,nullable=True);error=Column(String(500),default='')
+ id=Column(Integer,primary_key=True);garment_id=Column(Integer,ForeignKey('garments.id'),nullable=False);profile_id=Column(Integer,ForeignKey('profiles.id'),nullable=True);state=Column(String(20),default='queued');result=Column(JSON,nullable=True);error=Column(String(500),default='')
+class FitWithdrawal(Base):
+ __tablename__='fit_withdrawals'
+ id=Column(Integer,primary_key=True);profile_id=Column(Integer,unique=True,nullable=False);profile_code=Column(String(40),nullable=False);reason=Column(String(500),nullable=False);requested_at=Column(String(32),nullable=False);cleaned_at=Column(String(32),nullable=True);state=Column(String(20),default='pending',nullable=False)
 class Fitting(Base):
  __tablename__='fittings'
  id=Column(Integer,primary_key=True);garment_id=Column(Integer,ForeignKey('garments.id'),nullable=False);profile_id=Column(Integer,ForeignKey('profiles.id'),nullable=False);slot=Column(Integer,nullable=False);starts=Column(String(32),nullable=False);ends=Column(String(32),nullable=False);state=Column(String(20),default='reserved',nullable=False)
